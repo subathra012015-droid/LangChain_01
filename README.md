@@ -8,8 +8,9 @@ Each functionality is created, tested, validated and deployed locally before dev
 
 Completed:
 
-- Functionality 0 — Project Foundation
-- Functionality 1 — Health and System Status
+- Functionality 0 - Project Foundation
+- Functionality 1 - Health and System Status
+- Functionality 2 - SQLite Foundation
 
 The application currently provides:
 
@@ -21,16 +22,26 @@ The application currently provides:
 - FastAPI health endpoint
 - Streamlit system-status display
 - Safe unavailable-backend handling
-- Automated backend and frontend tests
+- SQLite database foundation
+- Department, user, role and permission tables
+- Controlled ingestion-record structure
+- Concurrency-friendly SQLite configuration
+- Isolated automated database tests
 - Secure Git exclusions
 
 The following features will be added separately:
 
-- SQLite history database
+- Secure authentication
+- Admin role assignment
+- Role-based authorization
+- Policy Maker approval workflow
 - Multi-format document ingestion
 - Text splitting
 - Hugging Face embeddings
 - FAISS vector storage and retrieval
+- Customer query processing
+- Approved website fallback
+- Private repeated-issue matching
 - LangChain RAG pipeline
 - OpenAI answer generation
 - LangSmith tracing
@@ -42,7 +53,10 @@ LangChain_01/
 ├── backend/
 │   ├── __init__.py
 │   ├── config.py
+│   ├── database.py
+│   ├── ingestion_models.py
 │   ├── main.py
+│   ├── models.py
 │   └── schemas.py
 ├── frontend/
 │   ├── __init__.py
@@ -52,18 +66,20 @@ LangChain_01/
 │       └── .gitkeep
 ├── tests/
 │   ├── __init__.py
+│   ├── test_database.py
 │   ├── test_frontend.py
 │   └── test_main.py
 ├── .env
 ├── .env.example
 ├── .gitignore
 ├── requirements.txt
+├── rag_app.db
 └── README.md
 ```
 
-The `.env` file and `venv/` folder exist locally but are intentionally excluded from Git.
+The `.env`, `venv/` and `rag_app.db` files exist locally but are intentionally excluded from Git.
 
-The SQLite database and FAISS index will be generated only when their functionalities are implemented.
+The SQLite database is generated locally when FastAPI starts. FAISS files will be generated only when the FAISS functionality is implemented.
 
 ## Requirements
 
@@ -136,7 +152,7 @@ python -m pytest -v
 Current expected result:
 
 ```text
-6 passed
+10 passed
 ```
 
 Tests do not run automatically when FastAPI or Streamlit starts. Run them manually during development. A CI/CD workflow can automate them later.
@@ -178,7 +194,7 @@ Current response:
   "application": "LangChain RAG Application",
   "environment": "development",
   "backend": "available",
-  "database": "not_configured",
+  "database": "available",
   "faiss": "not_configured",
   "langsmith": "not_configured"
 }
@@ -191,8 +207,9 @@ The endpoint deliberately excludes:
 - Local filesystem paths
 - Authorization headers
 - Detailed internal exceptions
+- Table contents
 
-SQLite, FAISS and LangSmith will receive real health checks when their functionalities are implemented.
+FAISS and LangSmith will receive real health checks when their functionalities are implemented.
 
 ## Run the Streamlit frontend
 
@@ -211,7 +228,7 @@ Frontend:
 http://127.0.0.1:8501
 ```
 
-The frontend calls FastAPI’s `/health` endpoint and displays:
+The frontend calls FastAPI's `/health` endpoint and displays:
 
 - Backend availability
 - Database status
@@ -227,15 +244,120 @@ Stop either local server using:
 Ctrl+C
 ```
 
+## SQLite database foundation
+
+The application uses SQLite during local development:
+
+```text
+rag_app.db
+```
+
+The database is initialized when FastAPI starts. Existing tables and rows are preserved.
+
+### Current tables
+
+| Table | Purpose |
+|---|---|
+| `departments` | Organizational responsibility boundaries |
+| `roles` | Admin-assigned user roles |
+| `permissions` | Backend-authorized actions |
+| `role_permissions` | Connects roles to permissions |
+| `users` | Application user accounts |
+| `user_roles` | Connects users to Admin-assigned roles |
+| `ingestion_records` | Tracks controlled content submission, approval and indexing |
+
+The database currently contains no default users, roles, departments or ingestion records.
+
+Authentication, Admin role assignment and approval endpoints will be implemented as separate functionalities.
+
+### SQLite concurrency
+
+SQLite is configured with:
+
+```text
+PRAGMA foreign_keys=ON
+PRAGMA journal_mode=WAL
+PRAGMA busy_timeout=5000
+```
+
+These settings provide:
+
+- Foreign-key enforcement
+- Concurrent reading while a write is active
+- A five-second wait when another write temporarily holds the database lock
+
+SQLite supports multiple readers but only one writer at a time. PostgreSQL is recommended for a larger production deployment with many concurrent writes.
+
+### Database versus FAISS
+
+| SQLite | FAISS |
+|---|---|
+| Stores structured application records | Stores embedding vectors |
+| Stores users, roles and workflow status | Performs semantic retrieval |
+| Uses `rag_app.db` | Uses `index.faiss` and `index.pkl` |
+| Does not perform vector search | Does not manage users or approvals |
+
+FAISS has not yet been implemented.
+
+### Database health
+
+The FastAPI startup process:
+
+```text
+Load configuration
+→ initialize missing tables
+→ check the database connection
+→ record database readiness
+```
+
+The `/health` endpoint reports:
+
+```json
+{
+  "database": "available"
+}
+```
+
+It does not expose the database URL, filename, credentials, table contents or raw exceptions.
+
+### Test isolation
+
+Automated database tests use temporary SQLite files managed by Pytest.
+
+They do not insert test users, departments or ingestion records into the development `rag_app.db`.
+
 ## Health checks versus automated tests
 
 Health checks and automated tests have different purposes.
 
-- `/health` checks the running application’s current component status.
+- `/health` checks the running application's current component status.
 - Pytest verifies that the code behaves as expected.
 - LangSmith will later trace LangChain pipeline executions.
 
 Tests should run before deployment, not during every production startup.
+
+## Planned customer-safe response
+
+When no approved answer is available, the customer-facing application will use:
+
+```text
+That's a thoughtful question and a valuable perspective. Thank you for
+raising it. It will be taken into consideration as our guidance continues
+to evolve.
+```
+
+The customer will not see:
+
+- Private review workflow
+- Similar-issue checks
+- Similarity scores
+- Internal approval or rejection status
+- Policy Maker identity
+- Internal notes
+- Department assignment
+- LangSmith traces
+
+This customer-query functionality has not yet been implemented.
 
 ## Security
 
@@ -255,4 +377,4 @@ Before committing changes, run:
 git status --short
 ```
 
-Confirm that `.env` never appears.
+Confirm that `.env`, `venv/` and `rag_app.db` never appear.

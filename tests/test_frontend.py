@@ -19,7 +19,7 @@ def test_fetch_backend_health_returns_valid_data() -> None:
         "application": "LangChain RAG Application",
         "environment": "development",
         "backend": "available",
-        "database": "not_configured",
+        "database": "available",
         "faiss": "not_configured",
         "langsmith": "not_configured",
     }

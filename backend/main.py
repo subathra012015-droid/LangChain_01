@@ -1,27 +1,80 @@
 """FastAPI entry point for the LangChain RAG backend.
 
-Functionality 1 adds a safe health endpoint. Database access, document
-ingestion, FAISS retrieval and AI operations will be introduced
-individually in later functionalities.
+Functionality 2 initializes the SQLite foundation during application
+startup and reports actual database readiness through the health endpoint.
 """
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+import logging
+
 from fastapi import FastAPI
+from sqlalchemy.exc import SQLAlchemyError
 
 from backend.config import get_settings
+from backend.database import (
+    check_database_connection,
+    initialize_database,
+)
 from backend.schemas import HealthResponse
 
-# Load the validated configuration once during application startup.
-# No secret values are printed or returned to the frontend.
+# Create a module logger for safe operational messages.
+# Detailed database credentials and connection strings are never logged.
+logger = logging.getLogger(__name__)
+
+
+# Load validated configuration once during application startup.
 settings = get_settings()
 
 
-# Create the FastAPI application.
-# The application name comes dynamically from .env or the deployment
-# environment instead of being hard-coded in this file.
+@asynccontextmanager
+async def application_lifespan(
+    application: FastAPI,
+) -> AsyncIterator[None]:
+    """Initialize and close application-level resources.
+
+    Args:
+        application: The FastAPI application being started.
+
+    Yields:
+        Control to FastAPI while the application is running.
+
+    Startup behaviour:
+        - Create missing database tables.
+        - Preserve existing tables and records.
+        - Perform a lightweight connection check.
+        - Store only a Boolean readiness result.
+
+    Failure behaviour:
+        The backend remains available and reports degraded health. Raw
+        database exceptions and connection details are not exposed.
+    """
+
+    # Start conservatively. The value becomes True only after table
+    # initialization and a successful connection check.
+    application.state.database_available = False
+
+    try:
+        initialize_database()
+        application.state.database_available = check_database_connection()
+    except SQLAlchemyError:
+        # Keep the message generic to avoid exposing a database URL,
+        # local path or future credentials.
+        logger.error("Database initialization failed.")
+        application.state.database_available = False
+
+    yield
+
+    # SQLite connections are managed by SQLAlchemy's engine and session
+    # pools. No application-wide session is kept open here.
+
+
+# Create FastAPI with the recommended lifespan mechanism.
 app = FastAPI(
     title=settings.app_name,
     description="Backend API for the LangChain RAG application.",
-    version="0.2.0",
+    version="0.3.0",
+    lifespan=application_lifespan,
 )
 
 
@@ -31,10 +84,6 @@ def read_root() -> dict[str, str]:
 
     Returns:
         A dictionary containing a safe status message.
-
-    Security:
-        This response deliberately excludes environment variables,
-        local file paths, database details and API keys.
     """
 
     return {
@@ -53,22 +102,24 @@ def read_health() -> HealthResponse:
     Returns:
         A validated HealthResponse containing safe component statuses.
 
-    Current scope:
-        The backend is available. SQLite, FAISS and LangSmith are reported
-        as not configured because their functionalities have not been
-        implemented yet.
+    Database behaviour:
+        Database readiness is established during application startup.
+        The health request reads the stored Boolean result and does not
+        run the full test suite or recreate tables.
 
     Security:
-        The response excludes API keys, connection strings, filesystem
-        paths and detailed exception information.
+        The response excludes database URLs, paths, credentials,
+        exceptions and table contents.
     """
 
+    database_is_available = bool(getattr(app.state, "database_available", False))
+
     return HealthResponse(
-        status="healthy",
+        status="healthy" if database_is_available else "degraded",
         application=settings.app_name,
         environment=settings.app_env,
         backend="available",
-        database="not_configured",
+        database=("available" if database_is_available else "unavailable"),
         faiss="not_configured",
         langsmith="not_configured",
     )

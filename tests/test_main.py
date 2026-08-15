@@ -4,32 +4,25 @@ from fastapi.testclient import TestClient
 
 from backend.main import app
 
-# TestClient calls FastAPI directly without opening a network port or
-# requiring a separately running Uvicorn server.
+# TestClient calls FastAPI directly without opening a network port.
+# These endpoint tests deliberately do not enter the lifespan context,
+# preventing creation of the development rag_app.db file.
 client = TestClient(app)
 
 
-# Keep the expected health response in one place so the test remains
-# readable and any intentional future status change is easy to identify.
-EXPECTED_HEALTH_RESPONSE = {
+EXPECTED_HEALTHY_RESPONSE = {
     "status": "healthy",
     "application": "LangChain RAG Application",
     "environment": "development",
     "backend": "available",
-    "database": "not_configured",
+    "database": "available",
     "faiss": "not_configured",
     "langsmith": "not_configured",
 }
 
 
 def test_read_root_returns_successful_response() -> None:
-    """Verify that the root endpoint returns the expected safe response.
-
-    The test confirms:
-        - The endpoint accepts a GET request.
-        - The HTTP response status is 200.
-        - The response contains the expected application message.
-    """
+    """Verify that the root endpoint returns its safe response."""
 
     response = client.get("/")
 
@@ -39,25 +32,39 @@ def test_read_root_returns_successful_response() -> None:
     }
 
 
-def test_health_returns_expected_component_statuses() -> None:
-    """Verify that the health endpoint reports current component statuses.
+def test_health_reports_available_database() -> None:
+    """Verify healthy status after successful database initialization.
 
-    The test confirms that the backend is available while components not
-    yet implemented remain clearly marked as not configured.
+    The Boolean application state is set directly so the endpoint can be
+    tested without creating or connecting to the development database.
     """
+
+    app.state.database_available = True
 
     response = client.get("/health")
 
     assert response.status_code == 200
-    assert response.json() == EXPECTED_HEALTH_RESPONSE
+    assert response.json() == EXPECTED_HEALTHY_RESPONSE
+
+
+def test_health_reports_degraded_database() -> None:
+    """Verify degraded status when database initialization is unavailable."""
+
+    app.state.database_available = False
+
+    response = client.get("/health")
+    response_data = response.json()
+
+    assert response.status_code == 200
+    assert response_data["status"] == "degraded"
+    assert response_data["backend"] == "available"
+    assert response_data["database"] == "unavailable"
 
 
 def test_health_does_not_expose_sensitive_fields() -> None:
-    """Verify that the health response excludes sensitive configuration.
+    """Verify that health output excludes sensitive configuration."""
 
-    The check protects against accidentally returning secrets, database
-    connection strings, authorization values or internal filesystem paths.
-    """
+    app.state.database_available = True
 
     response = client.get("/health")
     response_fields = set(response.json().keys())
