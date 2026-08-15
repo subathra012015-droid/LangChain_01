@@ -1,0 +1,29 @@
+# FastAPI backend framework
+fastapi==0.141.1
+
+# Local ASGI server used to run FastAPI
+uvicorn==0.52.3
+
+# Browser-based Python frontend
+streamlit==1.61.1
+
+# HTTP client used by Streamlit to call FastAPI
+requests==2.34.2
+
+# Loads local environment variables from .env
+python-dotenv==1.2.2
+
+# Validates application configuration
+pydantic-settings==2.15.0
+
+# ORM used to communicate with SQLite
+sqlalchemy==2.0.52
+
+# Automated testing framework
+pytest==9.1.1
+
+# Current HTTP test client used internally by FastAPI and Starlette
+httpx2==2.10.0
+
+# Enables future FastAPI file uploads
+python-multipart==0.0.32

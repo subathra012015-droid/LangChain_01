@@ -1,0 +1,40 @@
+# Environment file containing real API keys and local configuration
+.env
+
+# Python virtual environments
+venv/
+.venv/
+
+# Python-generated cache and compiled files
+__pycache__/
+*.py[cod]
+
+# Pytest-generated cache
+.pytest_cache/
+
+# Type-checking and coverage files
+.mypy_cache/
+.coverage
+htmlcov/
+
+# VS Code workspace settings
+.vscode/
+
+# User-uploaded documents
+data/uploads/*
+
+# Keep the empty uploads directory available in Git
+!data/uploads/.gitkeep
+
+# Generated FAISS vector-store files
+faiss_index/
+
+# Generated SQLite database files
+rag_app.db
+rag_app.db-journal
+*.db-shm
+*.db-wal
+
+# Operating-system-generated files
+.DS_Store
+Thumbs.db
