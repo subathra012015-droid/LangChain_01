@@ -6,16 +6,25 @@ Each functionality is created, tested, validated and deployed locally before dev
 
 ## Current status
 
-Functionality 0 establishes the project foundation:
+Completed:
+
+- Functionality 0 — Project Foundation
+- Functionality 1 — Health and System Status
+
+The application currently provides:
 
 - Python 3.11 virtual environment
 - FastAPI backend
 - Streamlit frontend
 - Dynamic environment configuration
-- Automated testing with Pytest
+- FastAPI root endpoint
+- FastAPI health endpoint
+- Streamlit system-status display
+- Safe unavailable-backend handling
+- Automated backend and frontend tests
 - Secure Git exclusions
 
-The following features will be added separately in later functionalities:
+The following features will be added separately:
 
 - SQLite history database
 - Multi-format document ingestion
@@ -33,7 +42,8 @@ LangChain_01/
 ├── backend/
 │   ├── __init__.py
 │   ├── config.py
-│   └── main.py
+│   ├── main.py
+│   └── schemas.py
 ├── frontend/
 │   ├── __init__.py
 │   └── app.py
@@ -42,6 +52,7 @@ LangChain_01/
 │       └── .gitkeep
 ├── tests/
 │   ├── __init__.py
+│   ├── test_frontend.py
 │   └── test_main.py
 ├── .env
 ├── .env.example
@@ -52,6 +63,8 @@ LangChain_01/
 
 The `.env` file and `venv/` folder exist locally but are intentionally excluded from Git.
 
+The SQLite database and FAISS index will be generated only when their functionalities are implemented.
+
 ## Requirements
 
 - Windows 11
@@ -60,8 +73,6 @@ The `.env` file and `venv/` folder exist locally but are intentionally excluded 
 - Visual Studio Code
 
 ## Create the virtual environment
-
-From the project root:
 
 ```bat
 py -3.11 -m venv venv
@@ -85,7 +96,7 @@ python --version
 python -m pip install -r requirements.txt
 ```
 
-Verify package compatibility:
+Verify dependency compatibility:
 
 ```bat
 python -m pip check
@@ -95,7 +106,7 @@ python -m pip check
 
 Copy the variable names from `.env.example` into a local `.env` file.
 
-Example local development configuration:
+Example development configuration:
 
 ```env
 APP_NAME=LangChain RAG Application
@@ -106,7 +117,7 @@ BACKEND_URL=http://127.0.0.1:8000
 DATABASE_URL=sqlite:///./rag_app.db
 ```
 
-Supported `APP_ENV` values are:
+Supported `APP_ENV` values:
 
 - `development`
 - `testing`
@@ -121,6 +132,14 @@ Never commit `.env` or place API keys in source code.
 ```bat
 python -m pytest -v
 ```
+
+Current expected result:
+
+```text
+6 passed
+```
+
+Tests do not run automatically when FastAPI or Streamlit starts. Run them manually during development. A CI/CD workflow can automate them later.
 
 ## Run the FastAPI backend
 
@@ -143,9 +162,43 @@ Interactive API documentation:
 http://127.0.0.1:8000/docs
 ```
 
+## Health endpoint
+
+Open:
+
+```text
+http://127.0.0.1:8000/health
+```
+
+Current response:
+
+```json
+{
+  "status": "healthy",
+  "application": "LangChain RAG Application",
+  "environment": "development",
+  "backend": "available",
+  "database": "not_configured",
+  "faiss": "not_configured",
+  "langsmith": "not_configured"
+}
+```
+
+The endpoint deliberately excludes:
+
+- API keys
+- Database connection strings
+- Local filesystem paths
+- Authorization headers
+- Detailed internal exceptions
+
+SQLite, FAISS and LangSmith will receive real health checks when their functionalities are implemented.
+
 ## Run the Streamlit frontend
 
-Keep the backend running and open Terminal 2:
+Keep FastAPI running in Terminal 1.
+
+Open Terminal 2:
 
 ```bat
 venv\Scripts\activate
@@ -158,15 +211,35 @@ Frontend:
 http://127.0.0.1:8501
 ```
 
+The frontend calls FastAPI’s `/health` endpoint and displays:
+
+- Backend availability
+- Database status
+- FAISS status
+- LangSmith status
+- Current environment
+
+If FastAPI is stopped, Streamlit displays a safe unavailable-backend message instead of crashing.
+
 Stop either local server using:
 
 ```text
 Ctrl+C
 ```
 
+## Health checks versus automated tests
+
+Health checks and automated tests have different purposes.
+
+- `/health` checks the running application’s current component status.
+- Pytest verifies that the code behaves as expected.
+- LangSmith will later trace LangChain pipeline executions.
+
+Tests should run before deployment, not during every production startup.
+
 ## Security
 
-The following files and folders are excluded from Git:
+The following are excluded from Git:
 
 - `.env`
 - `venv/`
